@@ -32,9 +32,12 @@ class GifConfig(BaseModel):
     gif_max_frames: int = 100
 
 
-class TranslatorConfig(BaseModel):
-    baidu_trans_appid: str = ""
-    baidu_trans_apikey: str = ""
+class TranslatorConfig(BaseModel):  
+    baidu_trans_appid: str = ""  
+    baidu_trans_apikey: str = ""  
+    openai_api_base_url: str = ""  
+    openai_api_key: str = ""  
+    translate_type: str = "baidu"  # 可选值: "baidu", "openai"
 
 
 class ServerConfig(BaseModel):

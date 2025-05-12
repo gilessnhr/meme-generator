@@ -340,29 +340,81 @@ def make_gif_or_combined_gif(
     return save_gif(frames, duration)
 
 
-def translate(text: str, lang_from: str = "auto", lang_to: str = "zh") -> str:
-    appid = meme_config.translate.baidu_trans_appid
-    apikey = meme_config.translate.baidu_trans_apikey
-    if not appid or not apikey:
-        raise MemeFeedback(
-            '"baidu_trans_appid" 或 "baidu_trans_apikey" 未设置，请检查配置文件！'
-        )
-    salt = str(round(time.time() * 1000))
-    sign_raw = appid + text + salt + apikey
-    sign = hashlib.md5(sign_raw.encode("utf8")).hexdigest()
-    params = {
-        "q": text,
-        "from": lang_from,
-        "to": lang_to,
-        "appid": appid,
-        "salt": salt,
-        "sign": sign,
-    }
-    url = "https://fanyi-api.baidu.com/api/trans/vip/translate"
-    resp = httpx.get(url, params=params)
-    result = resp.json()
-    return result["trans_result"][0]["dst"]
+def translate(text: str, lang_from: str = "auto", lang_to: str = "zh") -> str:  
+    translate_type = meme_config.translate.translate_type  
+      
+    if translate_type == "baidu":  
+        return baidu_translate(text, lang_from, lang_to)  
+    elif translate_type == "openai":  
+        return openai_translate(text, lang_from, lang_to)  
+    else:  
+        raise MemeFeedback(f"不支持的翻译类型: {translate_type}")
 
+def baidu_translate(text: str, lang_from: str = "auto", lang_to: str = "zh") -> str:  
+    appid = meme_config.translate.baidu_trans_appid  
+    apikey = meme_config.translate.baidu_trans_apikey  
+    if not appid or not apikey:  
+        raise MemeFeedback(  
+            '"baidu_trans_appid" 或 "baidu_trans_apikey" 未设置，请检查配置文件！'  
+        )  
+    salt = str(round(time.time() * 1000))  
+    sign_raw = appid + text + salt + apikey  
+    sign = hashlib.md5(sign_raw.encode("utf8")).hexdigest()  
+    params = {  
+        "q": text,  
+        "from": lang_from,  
+        "to": lang_to,  
+        "appid": appid,  
+        "salt": salt,  
+        "sign": sign,  
+    }  
+    url = "https://fanyi-api.baidu.com/api/trans/vip/translate"  
+    resp = httpx.get(url, params=params)  
+    result = resp.json()  
+    return result["trans_result"][0]["dst"]  
+  
+def openai_translate(text: str, lang_from: str = "auto", lang_to: str = "zh") -> str:  
+    api_base_url = meme_config.translate.openai_api_base_url  
+    api_key = meme_config.translate.openai_api_key  
+      
+    if not api_base_url or not api_key:  
+        raise MemeFeedback(  
+            '"openai_api_base_url" 或 "openai_api_key" 未设置，请检查配置文件！'  
+        )  
+      
+    # 根据目标语言设置system提示  
+    system_content = f"翻译以下内容成{'英文' if lang_to == 'en' else '中文'}"  
+      
+    # 构建请求数据  
+    data = {  
+        "model": "gemini-2.0-flash-lite",  # 可以从配置中读取  
+        "messages": [  
+            {  
+                "role": "system",  
+                "content": system_content  
+            },  
+            {  
+                "role": "user",  
+                "content": text  
+            }  
+        ]  
+    }  
+      
+    # 发送请求  
+    headers = {  
+        "Authorization": f"Bearer {api_key}",  
+        "Content-Type": "application/json"  
+    }  
+      
+    resp = httpx.post(api_base_url + "/v1/chat/completions", json=data, headers=headers)  
+    result = resp.json()  
+      
+    # 从响应中提取翻译结果  
+    try:  
+        translated_text = result["choices"][0]["message"]["content"].strip()  
+        return translated_text  
+    except (KeyError, IndexError) as e:  
+        raise MemeFeedback(f"OpenAI翻译API返回格式错误: {str(result)}")
 
 def random_text() -> str:
     return random.choice(
